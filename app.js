@@ -72,6 +72,7 @@
   const actionBar = document.getElementById('action-bar');
   const btnBack = document.getElementById('btn-back');
   const btnNext = document.getElementById('btn-next');
+  const barMsg = document.getElementById('bar-msg');
 
   /* ------------------------------------------------------------------
    * Hilfsfunktionen
@@ -529,6 +530,7 @@
    * Rendern & Navigation
    * ------------------------------------------------------------------ */
   function render(direction, initial) {
+    hideBarMessage();
     root.innerHTML = VIEWS[state.step]();
 
     if (state.step === STEP.PHOTOS) renderPhotoArea();
@@ -586,14 +588,53 @@
 
   function next() {
     if (state.submitting || navLock) return;
-    const s = state.step;
-    if (s === STEP.REVIEW) { submit(); return; }
+    try {
+      const s = state.step;
+      if (s === STEP.REVIEW) { submit(); return; }
 
-    const errors = validate(s);
-    if (errors.length) { showErrors(errors); return; }
+      // Werte direkt aus den Feldern übernehmen – Autofill (z. B. Safari)
+      // löst nicht immer ein input-/change-Ereignis aus.
+      syncFromDom();
 
-    if (state.editing && s !== STEP.SERVICE) { goTo(STEP.REVIEW); return; }
-    goTo(s + 1);
+      const errors = validate(s);
+      if (errors.length) { showErrors(errors); return; }
+
+      if (state.editing && s !== STEP.SERVICE) { goTo(STEP.REVIEW); return; }
+      goTo(s + 1);
+    } catch (err) {
+      if (window.console) console.error(err);
+      showBarMessage('Da ist etwas schiefgelaufen. Bitte versuchen Sie es noch einmal.');
+    }
+  }
+
+  function syncFromDom() {
+    root.querySelectorAll('input[name], textarea[name]').forEach(function (el) {
+      if (el.type === 'radio' && !el.checked) return;
+      if (el.name === 'city' && el.value === state.city) return; // cityAuto erhalten
+      onFieldInput({ target: el });
+    });
+  }
+
+  /* Hinweis direkt über den Buttons – bleibt sichtbar, auch wenn das
+     fehlerhafte Feld weiter oben außerhalb des Bildschirms liegt. */
+  function showBarMessage(text, targetKey) {
+    barMsg.innerHTML = icon('alert') + '<span>' + esc(text) + '</span>' +
+      (targetKey ? '<span class="bar-msg-link">Anzeigen</span>' : '');
+    barMsg.setAttribute('data-target', targetKey || '');
+    barMsg.hidden = false;
+  }
+  function hideBarMessage() {
+    barMsg.hidden = true;
+  }
+
+  function focusField(key) {
+    const field = document.getElementById('field-' + key) || document.getElementById('err-' + key);
+    if (!field) return;
+    const target = field.querySelector('input:checked') ||
+      field.querySelector('input:not([tabindex="-1"]), textarea, button');
+    const top = field.getBoundingClientRect().top + window.pageYOffset - 90;
+    window.scrollTo({ top: Math.max(0, top), behavior: REDUCED_MOTION ? 'auto' : 'smooth' });
+    if (target) target.focus({ preventScroll: true });
   }
 
   function back() {
@@ -723,12 +764,8 @@
     errors.forEach(function (er) { showError(er.key, er.msg); });
 
     const first = errors[0];
-    const field = document.getElementById('field-' + first.key) || document.getElementById('err-' + first.key);
-    if (!field) return;
-    const target = field.querySelector('input:checked') ||
-      field.querySelector('input:not([tabindex="-1"]), textarea, button');
-    field.scrollIntoView({ behavior: REDUCED_MOTION ? 'auto' : 'smooth', block: 'center' });
-    if (target) target.focus({ preventScroll: true });
+    showBarMessage(errors.length === 1 ? first.msg : 'Bitte prüfen Sie die ' + errors.length + ' markierten Angaben.', first.key);
+    focusField(first.key);
   }
 
   /* ------------------------------------------------------------------
@@ -1076,6 +1113,19 @@
   btnBack.addEventListener('click', back);
 
   form.addEventListener('input', onFieldInput);
+
+  // Hinweis über den Buttons ausblenden, sobald keine Fehler mehr sichtbar sind
+  form.addEventListener('input', function () {
+    if (!barMsg.hidden && !root.querySelector('.field-error:not([hidden])')) hideBarMessage();
+  });
+  form.addEventListener('change', function () {
+    if (!barMsg.hidden && !root.querySelector('.field-error:not([hidden])')) hideBarMessage();
+  });
+
+  barMsg.addEventListener('click', function () {
+    const key = barMsg.getAttribute('data-target');
+    if (key) focusField(key);
+  });
 
   form.addEventListener('change', function (e) {
     const t = e.target;

@@ -637,6 +637,29 @@ a { color: var(--primary); text-underline-offset: 2px; }
   padding: 12px 0 calc(12px + env(safe-area-inset-bottom));
 }
 .action-inner { display: flex; gap: 10px; }
+.bar-msg {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 48px;
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+  animation: errIn .25s var(--ease);
+}
+.bar-msg .icon { width: 20px; height: 20px; }
+.bar-msg span:first-of-type { flex: 1; }
+.bar-msg-link { flex: none; text-decoration: underline; text-underline-offset: 2px; }
 .btn-back { flex: 0 0 auto; padding: 0 16px 0 12px; }
 .btn-next { flex: 1; }
 .btn-next .icon { width: 20px; height: 20px; }
