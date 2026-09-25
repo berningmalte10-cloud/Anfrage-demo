@@ -52,7 +52,8 @@
       contact: { name: '', phone: '', email: '', callback: '', privacy: false, website: '' },
       startedAt: Date.now(),
       submitting: false,
-      preview: null
+      preview: null,
+      lastRequest: null
     };
   }
   let state = initialState();
@@ -165,6 +166,10 @@
   }
 
   function applyBranding() {
+    if (CFG.mode === 'live') {
+      const banner = document.getElementById('demo-banner');
+      if (banner) banner.hidden = true;
+    }
     const s = document.documentElement.style;
     const p = CFG.colors.primary;
     const a = CFG.colors.accent;
@@ -411,12 +416,13 @@
   }
 
   VIEWS[STEP.DONE] = function () {
+    const req = state.lastRequest;
     const d = state.preview;
     return '<div class="done">' +
       '<div class="done-check" aria-hidden="true">' + svg('<path d="M20 6L9 17l-5-5"/>', 'icon') + '</div>' +
       '<h1 class="step-title" tabindex="-1">Danke!</h1>' +
       '<p class="done-text">' + esc(CFG.texts.responseTime) + '</p>' +
-      '<div class="request-id"><span>Ihre Anfragenummer</span><strong>' + esc(d ? d.requestId : '') + '</strong></div>' +
+      '<div class="request-id"><span>Ihre Anfragenummer</span><strong>' + esc(req ? req.requestId : '') + '</strong></div>' +
       '<p class="hint hint-center">Bitte geben Sie diese Nummer bei Rückfragen an.</p>' +
       '</div>' +
       (d ? '<section class="preview-wrap" aria-labelledby="preview-title">' +
@@ -1037,32 +1043,43 @@
   /**
    * Versendet die Anfrage.
    *
-   * DEMO: Es wird NICHTS versendet. Die Funktion wartet kurz (damit es sich
-   * echt anfühlt) und zeigt anschließend nur die E-Mail-Vorschau an.
+   * mode "demo" (config.js): Es wird NICHTS versendet. Die Funktion wartet kurz
+   * und zeigt anschließend nur die E-Mail-Vorschau an.
    *
-   * LIVE-BETRIEB: Den Inhalt dieser Funktion durch einen Aufruf an ein
-   * PHP-Skript auf dem Webspace des Kunden ersetzen, z. B.:
-   *
-   *   async function sendRequest(data) {
-   *     const fd = new FormData();
-   *     const payload = Object.assign({}, data, { photos: undefined });
-   *     fd.append('payload', JSON.stringify(payload));
-   *     fd.append('website', data.honeypot);            // Honeypot serverseitig prüfen
-   *     data.photos.forEach(function (p, i) { fd.append('foto' + (i + 1), p.blob, p.name); });
-   *     const res = await fetch('anfrage.php', { method: 'POST', body: fd });
-   *     if (!res.ok) throw new Error('Versand fehlgeschlagen');
-   *     return res.json();
-   *   }
+   * mode "live" (config.js): Die Anfrage geht samt Fotos an das PHP-Skript
+   * (config.js -> endpoint, Standard "anfrage.php"), das die E-Mail verschickt.
    *
    * Muss ein Promise zurückgeben; ein Fehler (reject/throw) zeigt dem Nutzer
    * automatisch eine freundliche Fehlermeldung an.
    */
   function sendRequest(data) {
-    return new Promise(function (resolve) {
-      setTimeout(function () {
-        showEmailPreview(data);
-        resolve({ ok: true, requestId: data.requestId });
-      }, 900);
+    if (CFG.mode !== 'live') {
+      return new Promise(function (resolve) {
+        setTimeout(function () {
+          showEmailPreview(data);
+          resolve({ ok: true, requestId: data.requestId });
+        }, 900);
+      });
+    }
+
+    const payload = Object.assign({}, data, {
+      service: { id: data.service.id, label: data.service.label },
+      photos: data.photos.map(function (p) { return { name: p.name, width: p.width, height: p.height }; })
+    });
+    const fd = new FormData();
+    fd.append('payload', JSON.stringify(payload));
+    data.photos.forEach(function (p, i) { fd.append('foto' + (i + 1), p.blob, p.name); });
+
+    return fetch(CFG.endpoint || 'anfrage.php', {
+      method: 'POST',
+      body: fd,
+      headers: { 'Accept': 'application/json' },
+      credentials: 'same-origin'
+    }).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (json) {
+        if (!res.ok || !json.ok) throw new Error(json.error || 'Versand fehlgeschlagen');
+        return json;
+      });
     });
   }
 
@@ -1082,6 +1099,7 @@
     Promise.resolve()
       .then(function () { return sendRequest(data); })
       .then(function () {
+        state.lastRequest = data;
         state.submitting = false;
         btnNext.disabled = false;
         btnNext.classList.remove('is-loading');
