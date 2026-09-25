@@ -14,6 +14,9 @@ eine Vorschau der E-Mail, die der Betrieb erhalten würde.
 | `style.css`  | Gestaltung (Mobile-first)                                           |
 | `app.js`     | Ablauf, Prüfungen, Foto-Verarbeitung, `sendRequest(data)`           |
 | `config.js`  | **Alle betriebsspezifischen Inhalte** (Name, Farben, Leistungen, PLZ …) |
+| `anfrage.php` | Versand per E-Mail im Livebetrieb („Briefträger“)                   |
+| `mail-config.beispiel.php` | Vorlage für die E-Mail-Zugangsdaten                     |
+| `phpmailer/` | Versandbibliothek PHPMailer (LGPL-2.1)                               |
 
 ## Auf GitHub Pages veröffentlichen
 
@@ -33,8 +36,10 @@ eine Vorschau der E-Mail, die der Betrieb erhalten würde.
 - **Leistungen & Detailfragen:** `services`
 - **Zeiträume / Rückrufzeiten:** `timingOptions`, `callbackTimes`
 
-## Später: echter Versand
+## Livebetrieb beim Kunden (echter E-Mail-Versand)
 
-In `app.js` die Funktion `sendRequest(data)` durch einen `fetch()`-Aufruf an ein
-PHP-Skript ersetzen. Ein Beispiel steht als Kommentar direkt über der Funktion.
-Der Honeypot-Wert (`data.honeypot`) sollte serverseitig geprüft werden.
+Schritt-für-Schritt-Anleitung: **[ANLEITUNG-LIVEBETRIEB.md](ANLEITUNG-LIVEBETRIEB.md)**
+
+Kurz: `mode: "live"` in `config.js`, `mail-config.beispiel.php` als `mail-config.php` kopieren und
+ausfüllen, alles in einen Ordner auf dem Webspace des Kunden laden. `anfrage.php` verschickt die
+Anfrage dann per SMTP (PHPMailer) an den Betrieb. Auf GitHub Pages funktioniert der Versand nicht.

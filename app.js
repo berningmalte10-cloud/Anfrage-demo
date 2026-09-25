@@ -13,6 +13,48 @@
     return;
   }
 
+  applyUrlPersonalization();
+
+  /* ------------------------------------------------------------------
+   * Persönliche Demo über Link-Parameter (nur im Demo-Modus)
+   * z. B. ?firma=Maler%20Schmidt&farbe=%23204a87&plz=46395&ort=Bocholt&web=maler-schmidt.de
+   * Wird vom Vorschau-Lesezeichen (tools/vorschau-button.js) erzeugt.
+   * ------------------------------------------------------------------ */
+  function applyUrlPersonalization() {
+    if (CFG.mode === 'live' || !window.URLSearchParams) return;
+    const p = new URLSearchParams(window.location.search);
+    const clean = function (v, max) { return String(v || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, max); };
+    const hex = /^#[0-9a-fA-F]{6}$/;
+
+    const firma = clean(p.get('firma'), 60);
+    if (firma) {
+      CFG.company.name = firma;
+      CFG.company.logoText = clean(p.get('kuerzel'), 3) || firma
+        .replace(/\b(malerbetrieb|malermeister|maler|malerei|gmbh|und|&|co\.?|kg|inh\.?)\b/gi, ' ')
+        .split(/[\s\-]+/).filter(Boolean).slice(0, 2)
+        .map(function (w) { return w.charAt(0).toUpperCase(); }).join('') || firma.charAt(0).toUpperCase();
+      CFG.company.tagline = clean(p.get('slogan'), 60) || 'Ihre Anfrage in 2 Minuten';
+    }
+    if (hex.test(p.get('farbe') || '')) CFG.colors.primary = p.get('farbe');
+    if (hex.test(p.get('akzent') || '')) CFG.colors.accent = p.get('akzent');
+
+    const web = clean(p.get('web'), 80).replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '');
+    if (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(web)) {
+      CFG.company.website = 'www.' + web;
+      CFG.company.email = 'info@' + web;
+      CFG.company.senderEmail = 'anfrage@' + web;
+    }
+
+    const plz = (p.get('plz') || '').split(',').map(function (s) { return s.trim(); })
+      .filter(function (s) { return /^\d{5}$/.test(s); }).slice(0, 30);
+    if (plz.length) {
+      const ort = clean(p.get('ort'), 40);
+      CFG.serviceArea.postalCodes = plz;
+      CFG.serviceArea.cities = {};
+      if (ort) plz.forEach(function (z) { CFG.serviceArea.cities[z] = ort; });
+    }
+  }
+
   /* ------------------------------------------------------------------
    * Konstanten
    * ------------------------------------------------------------------ */
@@ -52,7 +94,8 @@
       contact: { name: '', phone: '', email: '', callback: '', privacy: false, website: '' },
       startedAt: Date.now(),
       submitting: false,
-      preview: null
+      preview: null,
+      lastRequest: null
     };
   }
   let state = initialState();
@@ -165,6 +208,10 @@
   }
 
   function applyBranding() {
+    if (CFG.mode === 'live') {
+      const banner = document.getElementById('demo-banner');
+      if (banner) banner.hidden = true;
+    }
     const s = document.documentElement.style;
     const p = CFG.colors.primary;
     const a = CFG.colors.accent;
@@ -411,12 +458,13 @@
   }
 
   VIEWS[STEP.DONE] = function () {
+    const req = state.lastRequest;
     const d = state.preview;
     return '<div class="done">' +
       '<div class="done-check" aria-hidden="true">' + svg('<path d="M20 6L9 17l-5-5"/>', 'icon') + '</div>' +
       '<h1 class="step-title" tabindex="-1">Danke!</h1>' +
       '<p class="done-text">' + esc(CFG.texts.responseTime) + '</p>' +
-      '<div class="request-id"><span>Ihre Anfragenummer</span><strong>' + esc(d ? d.requestId : '') + '</strong></div>' +
+      '<div class="request-id"><span>Ihre Anfragenummer</span><strong>' + esc(req ? req.requestId : '') + '</strong></div>' +
       '<p class="hint hint-center">Bitte geben Sie diese Nummer bei Rückfragen an.</p>' +
       '</div>' +
       (d ? '<section class="preview-wrap" aria-labelledby="preview-title">' +
@@ -1037,32 +1085,43 @@
   /**
    * Versendet die Anfrage.
    *
-   * DEMO: Es wird NICHTS versendet. Die Funktion wartet kurz (damit es sich
-   * echt anfühlt) und zeigt anschließend nur die E-Mail-Vorschau an.
+   * mode "demo" (config.js): Es wird NICHTS versendet. Die Funktion wartet kurz
+   * und zeigt anschließend nur die E-Mail-Vorschau an.
    *
-   * LIVE-BETRIEB: Den Inhalt dieser Funktion durch einen Aufruf an ein
-   * PHP-Skript auf dem Webspace des Kunden ersetzen, z. B.:
-   *
-   *   async function sendRequest(data) {
-   *     const fd = new FormData();
-   *     const payload = Object.assign({}, data, { photos: undefined });
-   *     fd.append('payload', JSON.stringify(payload));
-   *     fd.append('website', data.honeypot);            // Honeypot serverseitig prüfen
-   *     data.photos.forEach(function (p, i) { fd.append('foto' + (i + 1), p.blob, p.name); });
-   *     const res = await fetch('anfrage.php', { method: 'POST', body: fd });
-   *     if (!res.ok) throw new Error('Versand fehlgeschlagen');
-   *     return res.json();
-   *   }
+   * mode "live" (config.js): Die Anfrage geht samt Fotos an das PHP-Skript
+   * (config.js -> endpoint, Standard "anfrage.php"), das die E-Mail verschickt.
    *
    * Muss ein Promise zurückgeben; ein Fehler (reject/throw) zeigt dem Nutzer
    * automatisch eine freundliche Fehlermeldung an.
    */
   function sendRequest(data) {
-    return new Promise(function (resolve) {
-      setTimeout(function () {
-        showEmailPreview(data);
-        resolve({ ok: true, requestId: data.requestId });
-      }, 900);
+    if (CFG.mode !== 'live') {
+      return new Promise(function (resolve) {
+        setTimeout(function () {
+          showEmailPreview(data);
+          resolve({ ok: true, requestId: data.requestId });
+        }, 900);
+      });
+    }
+
+    const payload = Object.assign({}, data, {
+      service: { id: data.service.id, label: data.service.label },
+      photos: data.photos.map(function (p) { return { name: p.name, width: p.width, height: p.height }; })
+    });
+    const fd = new FormData();
+    fd.append('payload', JSON.stringify(payload));
+    data.photos.forEach(function (p, i) { fd.append('foto' + (i + 1), p.blob, p.name); });
+
+    return fetch(CFG.endpoint || 'anfrage.php', {
+      method: 'POST',
+      body: fd,
+      headers: { 'Accept': 'application/json' },
+      credentials: 'same-origin'
+    }).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (json) {
+        if (!res.ok || !json.ok) throw new Error(json.error || 'Versand fehlgeschlagen');
+        return json;
+      });
     });
   }
 
@@ -1082,6 +1141,7 @@
     Promise.resolve()
       .then(function () { return sendRequest(data); })
       .then(function () {
+        state.lastRequest = data;
         state.submitting = false;
         btnNext.disabled = false;
         btnNext.classList.remove('is-loading');

@@ -14,6 +14,14 @@
  */
 window.APP_CONFIG = {
 
+  /* ---------- Betriebsart ----------
+   *  "demo" = nichts wird versendet, am Ende erscheint die E-Mail-Vorschau
+   *  "live" = Anfrage wird über anfrage.php per E-Mail an den Betrieb gesendet
+   *           (nur auf dem Webspace des Kunden, nicht auf GitHub Pages!)
+   */
+  mode: "demo",
+  endpoint: "anfrage.php",
+
   /* ---------- Betrieb ---------- */
   company: {
     name: "Malerbetrieb Muster",
