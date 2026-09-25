@@ -13,6 +13,48 @@
     return;
   }
 
+  applyUrlPersonalization();
+
+  /* ------------------------------------------------------------------
+   * Persönliche Demo über Link-Parameter (nur im Demo-Modus)
+   * z. B. ?firma=Maler%20Schmidt&farbe=%23204a87&plz=46395&ort=Bocholt&web=maler-schmidt.de
+   * Wird vom Vorschau-Lesezeichen (tools/vorschau-button.js) erzeugt.
+   * ------------------------------------------------------------------ */
+  function applyUrlPersonalization() {
+    if (CFG.mode === 'live' || !window.URLSearchParams) return;
+    const p = new URLSearchParams(window.location.search);
+    const clean = function (v, max) { return String(v || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, max); };
+    const hex = /^#[0-9a-fA-F]{6}$/;
+
+    const firma = clean(p.get('firma'), 60);
+    if (firma) {
+      CFG.company.name = firma;
+      CFG.company.logoText = clean(p.get('kuerzel'), 3) || firma
+        .replace(/\b(malerbetrieb|malermeister|maler|malerei|gmbh|und|&|co\.?|kg|inh\.?)\b/gi, ' ')
+        .split(/[\s\-]+/).filter(Boolean).slice(0, 2)
+        .map(function (w) { return w.charAt(0).toUpperCase(); }).join('') || firma.charAt(0).toUpperCase();
+      CFG.company.tagline = clean(p.get('slogan'), 60) || 'Ihre Anfrage in 2 Minuten';
+    }
+    if (hex.test(p.get('farbe') || '')) CFG.colors.primary = p.get('farbe');
+    if (hex.test(p.get('akzent') || '')) CFG.colors.accent = p.get('akzent');
+
+    const web = clean(p.get('web'), 80).replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '');
+    if (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(web)) {
+      CFG.company.website = 'www.' + web;
+      CFG.company.email = 'info@' + web;
+      CFG.company.senderEmail = 'anfrage@' + web;
+    }
+
+    const plz = (p.get('plz') || '').split(',').map(function (s) { return s.trim(); })
+      .filter(function (s) { return /^\d{5}$/.test(s); }).slice(0, 30);
+    if (plz.length) {
+      const ort = clean(p.get('ort'), 40);
+      CFG.serviceArea.postalCodes = plz;
+      CFG.serviceArea.cities = {};
+      if (ort) plz.forEach(function (z) { CFG.serviceArea.cities[z] = ort; });
+    }
+  }
+
   /* ------------------------------------------------------------------
    * Konstanten
    * ------------------------------------------------------------------ */
