@@ -52,3 +52,10 @@ Schritt-für-Schritt-Anleitung: **[ANLEITUNG-LIVEBETRIEB.md](ANLEITUNG-LIVEBETRI
 Kurz: `mode: "live"` in `config.js`, `mail-config.beispiel.php` als `mail-config.php` kopieren und
 ausfüllen, alles in einen Ordner auf dem Webspace des Kunden laden. `anfrage.php` verschickt die
 Anfrage dann per SMTP (PHPMailer) an den Betrieb. Auf GitHub Pages funktioniert der Versand nicht.
+
+## Nach Änderungen: Versionsnummer erhöhen
+
+In `index.html` hängt an `style.css`, `config.js` und `app.js` eine Versionsnummer (`?v=…`).
+Nach jeder Änderung an diesen Dateien die Zahl erhöhen (z. B. auf das aktuelle Datum mit
+Uhrzeit). So laden Browser – vor allem Safari auf iPhone und iPad – sofort die neue Fassung
+statt einer zwischengespeicherten alten.
