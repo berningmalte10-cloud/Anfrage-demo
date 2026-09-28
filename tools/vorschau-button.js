@@ -75,12 +75,37 @@
     return found[0] || null;
   }
 
+  /* ---------- Gewerk erkennen (Stichwörter in Titel, Überschriften, Text) ---------- */
+  function gewerk() {
+    var kopf = (document.title + ' ' + Array.prototype.map.call(document.querySelectorAll('h1, h2, h3, nav'), function (e) { return e.innerText || ''; }).join(' ')).toLowerCase();
+    var text = kopf + ' ' + String(document.body.innerText || '').slice(0, 8000).toLowerCase();
+    var liste = {
+      maler: ['maler', 'anstrich', 'lackier', 'tapezier', 'fassadengestaltung'],
+      sanitaer: ['sanitär', 'sanitaer', 'heizung', 'badsanierung', 'installateur', 'wärmepumpe', 'haustechnik'],
+      elektro: ['elektro', 'elektriker', 'photovoltaik', 'wallbox', 'elektroinstallation'],
+      dach: ['dachdecker', 'bedachung', 'dacheindeckung', 'dachsanierung'],
+      tischler: ['tischler', 'schreiner', 'möbelbau', 'innenausbau'],
+      garten: ['garten', 'landschaftsbau', 'galabau', 'pflasterarbeiten'],
+      boden: ['fliesen', 'bodenleger', 'parkett', 'estrich']
+    };
+    var best = 'allgemein', max = 0;
+    for (var k in liste) {
+      var n = 0;
+      liste[k].forEach(function (w) {
+        n += (text.split(w).length - 1) + 3 * (kopf.split(w).length - 1);
+      });
+      if (n > max) { max = n; best = k; }
+    }
+    return max >= 3 ? best : 'allgemein';
+  }
+
   var farbe = hauptfarbe();
   var ort = plzOrt();
   var params = new URLSearchParams();
   params.set('firma', firmenname());
   params.set('farbe', farbe);
   params.set('web', location.hostname);
+  params.set('gewerk', gewerk());
   if (ort) { params.set('plz', ort.plz); params.set('ort', ort.ort); }
   var ziel = DEMO_URL + '?' + params.toString();
 
