@@ -32,6 +32,7 @@ auf dem Webspace des Kunden. Der Briefträger schickt jede Anfrage als E-Mail an
 2. **`config.js`** öffnen (mit einem einfachen Texteditor, z. B. Editor/TextEdit) und anpassen:
    - `mode: "demo"` ändern in **`mode: "live"`** ← wichtig, sonst wird nichts versendet!
    - Firmenname, Farben, Postleitzahlen usw. wie gewohnt eintragen.
+   - Bei `trade` das Gewerk des Betriebs eintragen, z. B. `"elektro"` oder `"maler"` (mögliche Werte stehen direkt darüber in config.js). Leistungen und Fragen lassen sich unter `trades` anpassen.
 3. Die Datei **`mail-config.beispiel.php`** kopieren und die Kopie **`mail-config.php`** nennen.
 4. **`mail-config.php`** öffnen und die Angaben des Kunden eintragen:
 
