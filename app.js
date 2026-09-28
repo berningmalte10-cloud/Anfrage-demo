@@ -13,7 +13,41 @@
     return;
   }
 
+  const URL_PARAMS = (CFG.mode !== 'live' && window.URLSearchParams) ? new URLSearchParams(window.location.search) : null;
+  let personalizedName = false;
+
   applyUrlPersonalization();
+  applyTrade(initialTrade());
+
+  /* ------------------------------------------------------------------
+   * Gewerk / Branche (config.js -> trades)
+   * Live: config.js -> trade. Demo zusätzlich: ?gewerk=elektro oder
+   * die Branchen-Auswahl im ersten Schritt.
+   * ------------------------------------------------------------------ */
+  function hasTrades() {
+    return !!(CFG.trades && Object.keys(CFG.trades).length);
+  }
+  function initialTrade() {
+    if (!hasTrades()) return null;
+    const wanted = URL_PARAMS && URL_PARAMS.get('gewerk');
+    if (wanted && CFG.trades[wanted]) return wanted;
+    return CFG.trades[CFG.trade] ? CFG.trade : Object.keys(CFG.trades)[0];
+  }
+  function applyTrade(key) {
+    if (!key || !hasTrades()) return;
+    const t = CFG.trades[key];
+    CFG.trade = key;
+    CFG.services = t.services;
+    // Beispiel-Firmenname nur in der Demo und nur ohne ?firma=…
+    if (CFG.mode !== 'live' && !personalizedName && t.company) {
+      if (t.company.name) CFG.company.name = t.company.name;
+      if (t.company.logoText) CFG.company.logoText = t.company.logoText;
+      if (t.company.tagline) CFG.company.tagline = t.company.tagline;
+    }
+  }
+  function showTradePicker() {
+    return CFG.mode !== 'live' && hasTrades() && Object.keys(CFG.trades).length > 1;
+  }
 
   /* ------------------------------------------------------------------
    * Persönliche Demo über Link-Parameter (nur im Demo-Modus)
@@ -21,16 +55,17 @@
    * Wird vom Vorschau-Lesezeichen (tools/vorschau-button.js) erzeugt.
    * ------------------------------------------------------------------ */
   function applyUrlPersonalization() {
-    if (CFG.mode === 'live' || !window.URLSearchParams) return;
-    const p = new URLSearchParams(window.location.search);
+    if (!URL_PARAMS) return;
+    const p = URL_PARAMS;
     const clean = function (v, max) { return String(v || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, max); };
     const hex = /^#[0-9a-fA-F]{6}$/;
 
     const firma = clean(p.get('firma'), 60);
     if (firma) {
+      personalizedName = true;
       CFG.company.name = firma;
       CFG.company.logoText = clean(p.get('kuerzel'), 3) || firma
-        .replace(/\b(malerbetrieb|malermeister|maler|malerei|gmbh|und|&|co\.?|kg|inh\.?)\b/gi, ' ')
+        .replace(/\b(malerbetrieb|malermeister|maler|malerei|elektro|elektrotechnik|sanitär|heizung|haustechnik|bad|dachdeckerei|dachdecker|bedachungen|tischlerei|schreinerei|garten|landschaftsbau|galabau|fliesen|boden|meisterbetrieb|gmbh|und|&|co\.?|kg|inh\.?)\b/gi, ' ')
         .split(/[\s\-]+/).filter(Boolean).slice(0, 2)
         .map(function (w) { return w.charAt(0).toUpperCase(); }).join('') || firma.charAt(0).toUpperCase();
       CFG.company.tagline = clean(p.get('slogan'), 60) || 'Ihre Anfrage in 2 Minuten';
@@ -151,6 +186,10 @@
     return '<svg class="' + (cls || 'icon') + '" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>';
   }
   function icon(name, cls) { return svg(ICONS[name] || '', cls); }
+  /* Leistungs-Icon: Name aus config.js -> icons oder direktes SVG-Markup */
+  function serviceIconMarkup(s) {
+    return (CFG.icons && CFG.icons[s.icon]) || s.icon || '';
+  }
 
   function esc(value) {
     return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) {
@@ -291,11 +330,12 @@
 
   VIEWS[STEP.SERVICE] = function () {
     return stepHead('Was dürfen wir für Sie tun?', 'Wählen Sie die gewünschte Leistung – ein Tipp genügt.') +
+      (showTradePicker() ? tradePickerHtml() : '') +
       '<div class="tiles" id="field-service">' +
       CFG.services.map(function (s) {
         const sel = state.service === s.id;
         return '<button type="button" class="tile' + (sel ? ' is-selected' : '') + '" data-action="pick-service" data-id="' + esc(s.id) + '" aria-pressed="' + sel + '">' +
-          '<span class="tile-icon">' + svg(s.icon, 'icon icon-lg') + '</span>' +
+          '<span class="tile-icon">' + svg(serviceIconMarkup(s), 'icon icon-lg') + '</span>' +
           '<span class="tile-label">' + esc(s.label) + '</span>' +
           (s.description ? '<span class="tile-sub">' + esc(s.description) + '</span>' : '') +
           '<span class="tile-check" aria-hidden="true">' + icon('check') + '</span>' +
@@ -303,6 +343,29 @@
       }).join('') +
       '</div>' + errorSlot('service');
   };
+
+  function tradePickerHtml() {
+    return '<div class="trade-picker">' +
+      '<label for="trade-select">Beispiel-Branche</label>' +
+      '<select id="trade-select" class="trade-select">' +
+      Object.keys(CFG.trades).map(function (k) {
+        return '<option value="' + esc(k) + '"' + (k === CFG.trade ? ' selected' : '') + '>' + esc(CFG.trades[k].label || k) + '</option>';
+      }).join('') +
+      '</select>' +
+      '<span class="trade-hint">Nur in der Demo sichtbar</span>' +
+      '</div>';
+  }
+
+  function switchTrade(key) {
+    if (!CFG.trades[key]) return;
+    applyTrade(key);
+    state.service = null;
+    state.details = {};
+    applyBranding();
+    render('fwd', true);
+    const sel = document.getElementById('trade-select');
+    if (sel) sel.focus();
+  }
 
   VIEWS[STEP.DETAILS] = function () {
     const svc = currentService();
@@ -431,7 +494,7 @@
 
     return stepHead('Bitte prüfen Sie Ihre Angaben', 'Mit „Ändern“ passen Sie einen Abschnitt direkt an.') +
       reviewCard('Leistung', STEP.SERVICE,
-        '<p class="review-service">' + svg(svc.icon, 'icon') + '<strong>' + esc(svc.label) + '</strong></p>') +
+        '<p class="review-service">' + svg(serviceIconMarkup(svc), 'icon') + '<strong>' + esc(svc.label) + '</strong></p>') +
       reviewCard('Details', STEP.DETAILS, '<dl class="dl">' + detailRows + '</dl>') +
       reviewCard('Einsatzort', STEP.LOCATION, '<dl class="dl">' + row('PLZ / Ort', state.plz + ' ' + state.city.trim()) + '</dl>') +
       reviewCard('Zeitraum', STEP.TIMING, '<dl class="dl">' + row('Beginn', timing ? timing.label : '') + '</dl>') +
@@ -1059,7 +1122,7 @@
       requestId: (CFG.requestIdPrefix || 'AN') + '-' + now.getFullYear() + '-' + randomDigits(4),
       createdAt: now.toISOString(),
       company: CFG.company.name,
-      service: { id: svc.id, label: svc.label, icon: svc.icon },
+      service: { id: svc.id, label: svc.label, icon: serviceIconMarkup(svc) },
       details: svc.questions
         .filter(function (q) { return String(state.details[q.id] || '').trim(); })
         .map(function (q) {
@@ -1189,6 +1252,10 @@
 
   form.addEventListener('change', function (e) {
     const t = e.target;
+    if (t.id === 'trade-select') {
+      switchTrade(t.value);
+      return;
+    }
     if (t.hasAttribute('data-photo-input')) {
       const files = t.files;
       handleFiles(files);

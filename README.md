@@ -1,4 +1,4 @@
-# Anfrage-Assistent – Demo (Malerbetrieb)
+# Anfrage-Assistent – Demo für Handwerksbetriebe
 
 Mehrstufiger Anfrage-Assistent für Handwerksbetriebe. Reines HTML/CSS/JavaScript,
 ohne Framework, ohne Build-Schritt und ohne externe Ressourcen. Läuft direkt auf GitHub Pages.
@@ -33,7 +33,16 @@ eine Vorschau der E-Mail, die der Betrieb erhalten würde.
 - **Farben:** `colors.primary` (Hauptfarbe) und `colors.accent` (Akzent) als Hex-Wert
 - **Einsatzgebiet:** `serviceArea.postalCodes` (Liste der PLZ) und optional `serviceArea.cities`
 - **Texte:** `texts.responseTime`, `texts.privacyUrl`, `texts.outOfArea`
-- **Leistungen & Detailfragen:** `services`
+- **Gewerk:** `trade` (z. B. `"elektro"`), Leistungen und Detailfragen je Gewerk unter `trades`
+- **Icons:** `icons` (Linien-Icons als SVG, in den Leistungen per Name verwendet)
+
+### Demo für verschiedene Gewerke
+
+Die Demo zeigt standardmäßig Beispiele aus mehreren Gewerken. Im ersten Schritt lässt sich die
+Beispiel-Branche wechseln. Per Link geht es direkt: `?gewerk=` mit `allgemein`, `maler`,
+`sanitaer`, `elektro`, `dach`, `tischler`, `garten` oder `boden`, z. B.
+`https://berningmalte10-cloud.github.io/Anfrage-demo/?gewerk=elektro&firma=Elektro%20Schmidt`.
+Das Vorschau-Lesezeichen erkennt das Gewerk einer Website automatisch.
 - **Zeiträume / Rückrufzeiten:** `timingOptions`, `callbackTimes`
 
 ## Livebetrieb beim Kunden (echter E-Mail-Versand)
